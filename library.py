@@ -8,7 +8,7 @@ import datetime
 from contextlib import redirect_stdout
 
 
-# pandas table options
+# pandas table options (for the command line output, without this rows/columns get cut)
 desired_width = 1080
 pd.set_option('display.width', desired_width)
 pd.set_option('display.max_columns', None)
