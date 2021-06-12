@@ -1,4 +1,4 @@
-""" UniProt Columns - Columns to be request in UniProt tab-format
+""" UniProt Columns - Columns to be request in UniProt tab, xls, html-format
 # https://www.uniprot.org/help/uniprotkb_column_names for available columns """
 columns = 'id,entry name,length,organism,organism-id,protein names,database(PDB),database(HGNC)'
 

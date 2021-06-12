@@ -1,5 +1,8 @@
+from typing import Any
+
 import argparse
 import library
+import logging
 
 if __name__ == '__main__':
     # implement additional databases
@@ -15,14 +18,13 @@ if __name__ == '__main__':
                         choices=['html', 'tab', 'xls', 'fasta', 'gff', 'txt', 'xml', 'rdf', 'list', 'rss'],
                         help='output format for UniProt entry')
     parser.add_argument('--service', '--uniprotservice', default='uniprot',
-                        choices=['uniprot', 'uniref', 'uniparc', 'taxonomy'],
-                        help='chooses uniprot service to query. not doing anything right now')
+                        choices=['uniprot', 'uniref', 'uniref100', 'uniref90', 'uniref50', 'uniparc'],
+                        help='chooses uniprot service to query. "uniref" defaults to UniRef100')
     parser.add_argument('-a', '--databases', '--dbs', dest='additional_databases', nargs='*',
-                        choices=['swissprot'],
+                        choices=['swissprot', 'pdb'],
                         help='to get results from additional databases; at the moment only SwissProt')
 
     args = parser.parse_args()
-    print(args)
+    logging.debug(args)
 
     request = library.handle_request(args)
-

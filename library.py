@@ -6,11 +6,12 @@ from requests import Response
 import config
 import datetime
 from contextlib import redirect_stdout
+import logging
 
 
 # pandas table options (for the command line output, without this rows/columns get cut)
-desired_width = 1080
-pd.set_option('display.width', desired_width)
+DESIRED_WIDTH = 1080
+pd.set_option('display.width', DESIRED_WIDTH)
 pd.set_option('display.max_columns', None)
 
 
@@ -21,51 +22,46 @@ pd.set_option('display.max_columns', None)
 def handle_request(args):
     """Starting point for requests
     checks the given arguments and calls the appropriate functions to handle the request"""
+    func_map = {"swissprot": swissprot_request, "pdb": pdb_request}
+
     if args.dsv_list:
-        args.request = convert_dsv_list(args.request, args.delim)
+        args.request = convert_dsv_file(args.request, args.delim)
 
-    if 'tab' == args.format:
-        for uniprot_id in args.request:
-            response = uniprot_request(args.service, query=uniprot_id,
-                                       format='tab',
-                                       columns=config.columns,
-                                       limit='50')
-            # do something with the return value (like maybe save the fucking file)
-            save_response_to_file(response, 'UniProt', uniprot_id, args.format)
+    for uniprot_id in args.request:
+        service = args.service
+        entry_id = uniprot_id
+        if 'uniref' in args.service:
+            service = 'uniref'
+            if 'uniref' == args.service:
+                args.service = 'uniref100'
+            entry_id = f"{args.service}_{uniprot_id}"
+        elif 'uniparc' == args.service:
+            entry_id = convert_uniprot_id('UPARC', uniprot_id)
 
-    else:
-        for uniprot_id in args.request:
-            response = requests.get('http://www.uniprot.org/uniprot/' + uniprot_id + '.' + args.format)
-            save_response_to_file(response, 'UniProt', uniprot_id, args.format)
+        response = uni_all_request(service, query=entry_id,
+                                   format=args.format,
+                                   columns=config.columns,
+                                   limit='50')
 
-    if 'swissprot' in args.additional_databases:
-        handle = ExPASy.get_sprot_raw(uniprot_id)
-        try:
-            sp_rec = SwissProt.read(handle)
-        except ValueError:
-            print("WARNING: Accession %s not found" % accession)
-        with open("SwissProt_" + uniprot_id + "_" + datetime.datetime.now().strftime("%Y-%m-%d_%X").replace(":", "-"),
-                  mode='a') as f_out:
-            for info in config.swiss_prot_info:
-                with redirect_stdout(f_out):
-                    exec("print(sp_rec." + info + ")")
+        save_response_to_file(response, args.service, entry_id, args.format)
+
+        for adb in args.additional_databases:
+            func_map[adb](uniprot_id)
 
 
 def save_response_to_file(response, database, entry_id, format):
-    with open(database + "_" + entry_id + "_" + datetime.datetime.now().strftime("%Y-%m-%d_%X").replace(":", "-")
-              + "." + format,
-              mode='wb') as f_out:
+    with open(f"{database}_{entry_id}_{datetime.datetime.now().strftime('%Y-%m-%d_%X')}.{format}", mode='wb') as f_out:
         f_out.write(response.content)
 
-def convert_dsv_list(id_list, sep=","):
+
+def convert_dsv_file(dsv_file, sep):
     """Takes a delimiter-separated value file that is a list of IDs and iterates over the IDs"""
-    with open(id_list[0]) as f_in:
+    with open(dsv_file[0]) as f_in:
         list = f_in.read()
-        converted_list = list.split(sep)
-        return converted_list
+        return list.split(sep)
 
 
-def convert_uniprot_id(database='PDB_ID', uniprot_id='P62979'):
+def convert_uniprot_id(database, uniprot_id):
     """Takes a database and an UniprotID and returns the corresponding ID in the given database"""
     params = {
         'from': 'ACC+ID',
@@ -79,72 +75,56 @@ def convert_uniprot_id(database='PDB_ID', uniprot_id='P62979'):
     return response
 
 
-def server_request(base_url, entry_id, **kwargs) -> object:
+def server_request(base_url, **kwargs) -> object:
     """General server request
     Takes a request and returns a single entry"""
     params = ''
-    response: Response = requests.get(f'{base_url}{entry_id}{params}', params=kwargs)
-    print(response.url)
+    response: Response = requests.get(f'{base_url}{params}', params=kwargs)
+    print(f"Requested URL: {response.url}")
     if not response.ok:
         response.raise_for_status()
     return response
 
 
-def uniprot_request(service, **kwargs):
+def uni_all_request(service, **kwargs):
     """Uniprot server request
-    takes the specific service (uniprot, uniref, uniproc, taxonomy) and any additional arguments
+    takes the specific service (uniprot, uniref, uniproc) and any additional arguments
     calls server_request() and returns the single entry returned"""
-    response = server_request('http://www.uniprot.org/' + service + '/', entry_id='', **kwargs)
-    uniprot_list = pd.read_table(StringIO(response.text))
-    uniprot_list.rename(columns={'Organism ID': 'ID'}, inplace=True)
-    print(uniprot_list)
-
+    response = server_request(f'http://www.uniprot.org/{service}/', **kwargs)
+    # these lines are for visual feedback in the terminal during coding and testing,
+    # but they don't work with all available formats
+    # uniprot_list = pd.read_table(StringIO(response.text))
+    # uniprot_list.rename(columns={'Organism ID': 'ID'}, inplace=True)
+    # print(uniprot_list)
     return response
+
+
+def swissprot_request(uniprot_id):
+    handle = ExPASy.get_sprot_raw(uniprot_id)
+    try:
+        sp_rec = SwissProt.read(handle)
+    except ValueError:
+        logging.warning(f"WARNING: Accession {accession} not found")
+    with open(f"SwissProt_{uniprot_id}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}",
+              mode='a') as f_out:
+        for info in config.swiss_prot_info:
+            with redirect_stdout(f_out):
+                print(info, end=": ")
+                exec("print(sp_rec." + info + ")")
+
+
+def pdb_request(uniprot_id):
+    pdb_ids_table = convert_uniprot_id('PDB_ID', uniprot_id)
+    converted_list = pd.read_table(StringIO(pdb_ids_table.text))
+    with open(f"PDB_{uniprot_id}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}",
+              mode='a') as f_out:
+        for entry in converted_list['To']:
+            response: Response = requests.get(f'https://data.rcsb.org/rest/v1/core/entry/{entry}')
+            if not response.ok:
+                response.raise_for_status()
+            f_out.write(f"PDB-ID: {entry}\n{response.text}")
 
 
 if __name__ == '__main__':
 
-    # SwissProt
-    handle = ExPASy.get_sprot_raw('P62979')
-    sp_rec = SwissProt.read(handle)
-
-    print(sp_rec.entry_name, sp_rec.sequence_length, sp_rec.gene_name)
-    print(sp_rec.description)
-    print(sp_rec.organism, sp_rec.seqinfo)
-    print(sp_rec.sequence)
-    print(sp_rec.comments)
-    print(sp_rec.keywords)
-
-    from collections import defaultdict
-
-    done_features = set()
-    print(len(sp_rec.features))
-    for feature in sp_rec.features:
-        if feature in done_features:
-            continue
-        else:
-            done_features.add(feature)
-            print(feature)
-    print(len(sp_rec.cross_references))
-    per_source = defaultdict(list)
-    for xref in sp_rec.cross_references:
-        source = xref[0]
-        per_source[source].append(xref[1:])
-    print(per_source.keys())
-    done_GOs = set()
-    print(len(per_source['GO']))
-    for annot in per_source['GO']:
-        if annot[1][0] in done_GOs:
-            continue
-        else:
-            done_GOs.add(annot[1][0])
-    print(annot)
-
-    # multiple SwissProt Records
-    accessions = ["O23729", "O23730", "O23731"]
-    records = []
-
-    for accession in accessions:
-        handle = ExPASy.get_sprot_raw(accession)
-        record = SwissProt.read(handle)
-        records.append(record)
+    pass
