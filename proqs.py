@@ -19,12 +19,10 @@ if __name__ == '__main__':
                         help='chooses uniprot service to query. not doing anything right now')
     parser.add_argument('-a', '--databases', '--dbs', dest='additional_databases', nargs='*',
                         choices=['swissprot'],
-                        help='to get results from additional databases, at the moment only SwissProt')
-    parser.set_defaults(service='uniprot')
+                        help='to get results from additional databases; at the moment only SwissProt')
 
     args = parser.parse_args()
     print(args)
 
     request = library.handle_request(args)
-
 
