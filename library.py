@@ -15,10 +15,6 @@ pd.set_option('display.width', DESIRED_WIDTH)
 pd.set_option('display.max_columns', None)
 
 
-# def request_chosen_services
-# iterates over chosen services and call service requests
-
-
 def handle_request(args):
     """Starting point for requests
     checks the given arguments and calls the appropriate functions to handle the request"""
