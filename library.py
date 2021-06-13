@@ -41,8 +41,9 @@ def handle_request(args):
 
         save_response_to_file(response, args.service, entry_id, args.format)
 
-        for adb in args.additional_databases:
-            func_map[adb](uniprot_id)
+        if args.additional_databases:
+            for adb in args.additional_databases:
+                func_map[adb](uniprot_id)
 
 
 def save_response_to_file(response, database, entry_id, format):
