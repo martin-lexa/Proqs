@@ -1,4 +1,4 @@
-""" UniProt Columns - Columns to be request in UniProt tab, xls, html-format
+""" UniProt Columns - Columns to be requested in UniProt tab, xls, html-format
 # https://www.uniprot.org/help/uniprotkb_column_names for available columns """
 columns = 'id,entry name,length,organism,organism-id,protein names,database(PDB),database(HGNC)'
 
@@ -9,5 +9,3 @@ gene_name, host_organism, host_taxonomy_id, keywords, molecule_type, organelle, 
 protein_existence, references, seqinfo, sequence, sequence_length, sequence_update taxonomy_id """
 swiss_prot_info = ['entry_name', 'sequence_length', 'gene_name', 'description', 'organism',
                    'seqinfo', 'sequence', 'comments', 'keywords']
-
-

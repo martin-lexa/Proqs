@@ -32,7 +32,8 @@ def handle_request(args):
                 args.service = 'uniref100'
             entry_id = f"{args.service}_{uniprot_id}"
         elif 'uniparc' == args.service:
-            entry_id = convert_uniprot_id('UPARC', uniprot_id)
+            uniparc_id = convert_uniprot_id('UPARC', uniprot_id)
+            entry_id = uniparc_id.iloc[0, 1]
 
         response = uni_all_request(service, query=entry_id,
                                    format=args.format,
@@ -69,7 +70,8 @@ def convert_uniprot_id(database, uniprot_id):
     response: Response = requests.get('https://www.uniprot.org/uploadlists', params=params)
     if not response.ok:
         response.raise_for_status()
-    return response
+    converted_response = pd.read_table(StringIO(response.text))
+    return converted_response
 
 
 def server_request(base_url, **kwargs) -> object:
@@ -112,10 +114,9 @@ def swissprot_request(uniprot_id):
 
 def pdb_request(uniprot_id):
     pdb_ids_table = convert_uniprot_id('PDB_ID', uniprot_id)
-    converted_list = pd.read_table(StringIO(pdb_ids_table.text))
     with open(f"PDB_{uniprot_id}_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}",
               mode='a') as f_out:
-        for entry in converted_list['To']:
+        for entry in pdb_ids_table['To']:
             response: Response = requests.get(f'https://data.rcsb.org/rest/v1/core/entry/{entry}')
             if not response.ok:
                 response.raise_for_status()
